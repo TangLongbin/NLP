@@ -4,7 +4,6 @@
 @author: hyl
 """
 import re
-import jieba
 import os
 
 N = 3
@@ -80,15 +79,7 @@ def precondition(sentence):
     suf = sentence[pos + 6:]
     # 去数字，符号，停止词，划分词语
     pre = re.sub(r'[{}]+'.format(punctuation), '', pre)
-    pre_cut = list(jieba.cut(pre, cut_all=False))
     suf = re.sub(r'[{}]+'.format(punctuation), '', suf)
-    suf_cut = list(jieba.cut(suf, cut_all=False))
-    for word in pre_cut[::-1]:
-        if word in stop_words:
-            pre_cut.remove(word)
-    for word in suf_cut[::-1]:
-        if word in stop_words:
-            suf_cut.remove(word)
     return pre_cut, suf_cut
 
 
