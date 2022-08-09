@@ -22,10 +22,10 @@ WindowSize = 5
 # Negative单词的数量
 NegaNum = 2
 # 词向量Feature维度
-EmbedSize = 256
+EmbedSize = 300
 
 # 单次训练使用的数量（可更具内存/显卡负载进行调整）
-Batch_Size = 128
+Batch_Size = 512
 # 学习速率（步长）
 LearningRate = 0.001
 
@@ -204,7 +204,7 @@ def  StartTraining():
             
             # 创建DataLoader
             dataset = Dataset(Text, word_to_idx, idx_to_word, word_freqs)
-            dataloader = torch.utils.data.DataLoader(dataset, batch_size = Batch_Size, shuffle = True, num_workers = 8)
+            dataloader = torch.utils.data.DataLoader(dataset, batch_size = Batch_Size, shuffle = True, num_workers = 2)
             
             # StartTraining
             for j in range(EpochsNum):
@@ -218,7 +218,6 @@ def  StartTraining():
                         input_labels = input_labels.cuda()
                         pos_labels = pos_labels.cuda()
                         neg_labels = neg_labels.cuda()
-
                     loss = Model(input_labels, pos_labels, neg_labels)
                     Optimizer.zero_grad()
                     loss.backward()
