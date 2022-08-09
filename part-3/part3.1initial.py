@@ -13,17 +13,16 @@ CONTEXT_SIZE = 2 #由前面两个词来预测这个单词
 EMBEDDING_DIM = 10  # 词向量嵌入的维度
 
 with open("output.txt", "r", encoding=('utf-8')) as f:
-    data = f.read()
-test_sentence = data #输入数据集
+    data = f.read() #输入数据集
 ngrams = [
     (
-        [test_sentence[i - j - 1] for j in range(CONTEXT_SIZE)],
-        test_sentence[i]
+        [data[i - j - 1] for j in range(CONTEXT_SIZE)],
+        data[i]
     )
-    for i in range(CONTEXT_SIZE, len(test_sentence))
+    for i in range(CONTEXT_SIZE, len(data))
 ]#将词分成三个为一组的词块，前两个为给定词，后一个为目标词
 
-vocab = set(test_sentence)#消除重复的词语
+vocab = set(data)#消除重复的词语
 word_to_ix = {word: i for i, word in enumerate(vocab)}#此处建立词典，建立对每个词的索引
 
 class NGramLanguageModeler(nn.Module):
