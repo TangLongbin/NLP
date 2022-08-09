@@ -1,136 +1,90 @@
 # -*- coding: utf-8 -*-
 """
-
 @author: hyl
 """
-import re
-import os
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
 
-N = 3
-word_dict = {}
-word_dict_2 = {}
-word_dict_3 = {}
+torch.manual_seed(1)
 
-# 调出二元和三元的词组
-for index in range(1, 1001):
-    # 这里调入数据
-    with open('文件' + str(index) + '.txt', 'r', encoding='utf-8-sig') as f:
-        for sentence in f.readlines():
-            words = sentence.strip().split(" ")
-            words.insert(0,  "<S>")
-            words.append("<E>")
-            if len(words) >= 3:
-                # 统计词组出现频率
-                for i in range(len(words)-1):
-                    key = (words[i], words[i+1])
-                    word_dict_2[key] = word_dict_2.get(key, 0) + 1
+CONTEXT_SIZE = 2 #由前面两个词来预测这个单词
+EMBEDDING_DIM = 10  # 词向量嵌入的维度
 
-                for j in range(len(words)-2):
-                    key = (words[j], words[j+1], words[j+2])
-                    word_dict_3[key] = word_dict_3.get(key, 0) + 1
+with open("output.txt", "r", encoding=('utf-8')) as f:
+    data = f.read()
+test_sentence = data #输入数据集
+ngrams = [
+    (
+        [test_sentence[i - j - 1] for j in range(CONTEXT_SIZE)],
+        test_sentence[i]
+    )
+    for i in range(CONTEXT_SIZE, len(test_sentence))
+]#将词分成三个为一组的词块，前两个为给定词，后一个为目标词
 
-len2 = len(word_dict_2.keys())
-len3 = len(word_dict_3.keys())
-print(len2, len3)
+vocab = set(test_sentence)#消除重复的词语
+word_to_ix = {word: i for i, word in enumerate(vocab)}#此处建立词典，建立对每个词的索引
 
+class NGramLanguageModeler(nn.Module):
+    
+    #初始化时定义单词表大小，想要嵌入的维度大小，上下文的长度
+    def __init__(self, vocab_size, embedding_dim, context_size):
+        # 继承自nn.Module，例行执行父类super 初始化方法
+        super(NGramLanguageModeler, self).__init__()
+        # 建立词嵌入模块
+        self.embeddings = nn.Embedding(vocab_size, embedding_dim)
+        #建立线性层
+        self.linear1 = nn.Linear(context_size * embedding_dim, 128)
+        self.linear2 = nn.Linear(128, vocab_size)
 
-def read_data(filename):
-    #读取当前路径下的 filename 文件，要求每一行是单独的数据，不会做其他处理
-    path = os.getcwd() + '/' + filename
-    data = []
-    with open(path, 'r', encoding='utf-8') as f:
-        for line in f.readlines():
-            data.append(line.strip())
-    return data
+    def forward(self, inputs):
+        # 将输入进行“嵌入”，并转化为“行向量”
+        embeds = self.embeddings(inputs).view((1, -1))
+        #通过两层线性层
+        out = F.relu(self.linear1(embeds))
+        out = self.linear2(out)
+        #将结果映射为概率的log
+        log_probs = F.log_softmax(out, dim=1)
+        return log_probs
+    
+#开始训练模型
 
+losses = []
+# 设置损失函数为 负对数似然损失函数(Negative Log Likelihood)
+loss_function = nn.NLLLoss()
+# 实例化我们的模型，传入：单词表的大小、嵌入维度、上下文长度
+model = NGramLanguageModeler(len(vocab), EMBEDDING_DIM, CONTEXT_SIZE)
+# 优化函数使用随机梯度下降算法，学习率设置为0.001
+optimizer = optim.SGD(model.parameters(), lr=0.001)
 
-def cal_prob(w1, w2, w3):
-    #当N = 3 时，计算该句子的概率, 使用加1法平滑数据，输出当w1,w2出现的情况下同时出现w1，w2，w3的概率
-    p1 = word_dict_2.get((w1, w2), 0) + len(word_dict_2.keys())
-    p2 = word_dict_3.get((w1, w2, w3), 0) + 1
-    return float(p2) / float(p1)
+for epoch in range(100):#训练100代
+    total_loss = 0
+    #循环context与target
+    for context, target in ngrams:
 
+        # Step 1. Prepare the inputs to be passed to the model (i.e, turn the words
+        # into integer indices and wrap them in tensors)
+        context_idxs = torch.tensor([word_to_ix[w] for w in context], dtype=torch.long)
 
-def get_related_words(pre_cut, suf_cut):
-    #取出 [???]附近的几个词
-    related_word = []
-    if len(pre_cut) > N - 1:
-        for j in range(N - 2, -1, -1):
-            related_word.append(pre_cut[-1 - j])
-    else:
-        related_word += pre_cut
-    related_word.append('???')
-    if len(suf_cut) > N - 1:
-        for j in range(N - 1):
-            related_word.append(suf_cut[j])
-    else:
-        related_word += suf_cut
-    return related_word
+        # Step 2. Recall that torch *accumulates* gradients. Before passing in a
+        # new instance, you need to zero out the gradients from the old
+        # instance
+        model.zero_grad()
 
+        # Step 3. Run the forward pass, getting log probabilities over next
+        # words
+        log_probs = model(context_idxs)
 
-def precondition(sentence):
-    #预处理，去除数字，符号，分词，输出'???'前后句子分词结果
-    # 注意要包含空格
-    punctuation = "0-9;,：.:＃＄％＆＇（）＊＋，－：；＜＝＞＠［＼］＾＿｀｛｜｝～｟｠" \
-                  "｢｣､、〃《》「」『』【】 〔〕〖〗〘〙〚〛〜〝〞–—‘’‛“”„‟…‧﹏\r。！!?？｡\n"
-    pos = sentence.find('[???]')
-    # ??? 前后的词语
-    pre = sentence[:pos]
-    suf = sentence[pos + 6:]
-    # 去数字，符号，停止词，划分词语
-    pre = re.sub(r'[{}]+'.format(punctuation), '', pre)
-    suf = re.sub(r'[{}]+'.format(punctuation), '', suf)
-    return pre_cut, suf_cut
+        # Step 4. Compute your loss function. (Again, Torch wants the target
+        # word wrapped in a tensor)
+        loss = loss_function(log_probs, torch.tensor([word_to_ix[target]], dtype=torch.long))
 
+        # Step 5. Do the backward pass and update the gradient
+        loss.backward()
+        optimizer.step()
 
-def predict(related_word):
-    #根据 ???附近的词来预测???,输出概率最大的词及其概率
-    max_prob = 0.0
-    predict_word = ''
-    for word in word_dict.keys():
-        index_of_unknow = related_word.index('???')
-        related_word[index_of_unknow] = word
-        # print(related_word)
-        prob = 1.0
-        for j in range(len(related_word) - 2):
-            prob = prob * cal_prob(related_word[j], related_word[j + 1], related_word[j + 2])
-        if prob > max_prob:
-            max_prob = prob
-            predict_word = word
-        related_word[index_of_unknow] = '???'
-    return max_prob, predict_word
-
-
-if __name__ == '__main__':
-    # 读取问题句子和答案以及停止词，位于同一路径下
-    questions = read_data('问题文档')
-    answer = read_data('答案文档')
-    stop_words = read_data('停止词文档')
-
-    # 读取单个词出现的频率
-    with open('文件', 'r', encoding='utf-8-sig') as f:
-        for line in f.readlines():
-            line = line.strip().split(' ')
-            word_dict[line[1]] = int(line[0])
-
-    accuracy = 0
-    predictions = []
-    for i in range(len(questions)):
-        sentence = questions[i]
-        # 预处理，去除数字、符号，分词
-        pre_cut, suf_cut = precondition(sentence)
-        # 取出该词附近的词语 [w1, w2, [???], w3, w4]
-        related_word = get_related_words(pre_cut, suf_cut)
-        # 预测，得到最合适的词，以及概率
-        max_prob, predict_word = predict(related_word)
-        predictions.append(predict_word)
-        if predict_word == answer[i]:
-            accuracy += 1
-            print(f'第{i+1}个句子:')
-            print(questions[i])
-            print(max_prob, predict_word, '\n')
-
-    print(accuracy)
-    with open('prediction.txt', 'w', encoding='utf-8') as f:
-        for prediction in predictions:
-            f.write(prediction + '\n')
+        # Get the Python number from a 1-element Tensor by calling tensor.item()
+        total_loss += loss.item()
+    losses.append(total_loss)
+print(losses)  # The loss decreased every iteration over the training data!
