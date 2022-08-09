@@ -9,8 +9,8 @@ import torch.optim as optim
 
 torch.manual_seed(1)
 
-CONTEXT_SIZE = 2 #由前面两个词来预测这个单词
-EMBEDDING_DIM = 10  # 词向量嵌入的维度
+CONTEXT_SIZE = 3 #由前面两个词来预测这个单词
+EMBEDDING_DIM = 15  # 词向量嵌入的维度
 
 with open("output.txt", "r", encoding=('utf-8')) as f:
     data = f.read() #输入数据集
