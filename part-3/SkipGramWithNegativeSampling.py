@@ -7,16 +7,16 @@ import numpy as np
 # 分词文件夹目录
 TokensDirPath = "/home/tanglongbin/NLP/nltk_text"
 # 作为词汇表的Tokens文件数量
-TokensFileNum = 10
+TokensFileNum = 20
 # 词汇量
-VocabSize = 10000
+VocabSize = 20000
 
 # 文章目录（split_text目录）
 TextDirPath = "/home/tanglongbin/NLP/split_text"
 # 用于训练的文章数量
-TextNum = 2
+TextNum = 100
 # 每篇文章训练的次数
-EpochsNum = 10
+EpochsNum = 2
 # 中心词一侧Positive单词的数量
 WindowSize = 5
 # Negative单词的数量
@@ -156,29 +156,29 @@ class EmbeddingModel(torch.nn.Module):
         return self.embed.weight.data.cpu().numpy()
 
 
-def StartTest(Model, word_to_idx, idx_to_word):
-    TestWords = ['data', 'were', 'used', 'in', 'the', 'subsequent', 'analysis', 'as']
-    
+# 返回与 Input_word 最相似的 Word_num 个单词
+# 返回一个二维 List[Word_num][1]
+# List[Word_num][0] 为单词，List[Word_num][1] 为相似度
+def CosineSimilarity(Model, word_to_idx, idx_to_word, Input_word, Word_num):
+    # 创建 Model Copy
     W = Model.embed.weight.data.clone()
     norm = W.norm(dim = 1).unsqueeze(dim = 1)
-    
+    # 单位化
     W = W/norm
     
-    ids = [word_to_idx.get(word, word_to_idx["<unk>"]) for word in TestWords]
-    
+    # 获取 Input_word 词向量
+    ids = [word_to_idx.get(Input_word, word_to_idx["<unk>"])]
     x = W[ids]
-    
+    # 计算 similarity
     similarity = torch.mm(x, W.T)
     
-    for i in range(len(TestWords)) :
-        topk = (-similarity[i,:]).argsort()[:5]
-        topk = [idx_to_word[j.item()] for j in topk]
-        print(TestWords[i], topk)
+    topk = (-similarity[0,:]).argsort()[:Word_num]
+    Res = [[idx_to_word[j.item()], similarity[0][j.item()].item()] for j in topk]
     
-    return
+    return Res
 
 
-def  StartTraining():
+def  StartTraining(word):
     
     # 获取Vocab
     Vocab = GetVocab()
@@ -225,15 +225,18 @@ def  StartTraining():
                     Optimizer.step()
         
                 print(f'Epoch {j+1}/{EpochsNum} - Loss: {loss.item():.4f}')
-            # StartTest(Model, word_to_idx, idx_to_word)
+            
+    # 输出 word 的词向量
+    print(Model.embed.weight.data[word_to_idx[word]])
+    # 输出与 word 最相似的 5 个词
+    print(CosineSimilarity(Model, word_to_idx, idx_to_word, word, 5))
     return
-
 
 
 def main():
     
     # 开始训练
-    StartTraining()
+    StartTraining(word = "this")
     
     return
 
