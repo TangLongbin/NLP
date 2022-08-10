@@ -2,6 +2,7 @@ import os
 import torch
 from collections import Counter
 import numpy as np
+import scipy
 
 
 # 分词文件夹目录
@@ -14,9 +15,9 @@ VocabSize = 20000
 # 文章目录（split_text目录）
 TextDirPath = "/home/tanglongbin/NLP/split_text"
 # 用于训练的文章数量
-TextNum = 100
+TextNum = 200
 # 每篇文章训练的次数
-EpochsNum = 2
+EpochsNum = 4
 # 中心词一侧Positive单词的数量
 WindowSize = 5
 # Negative单词的数量
@@ -162,8 +163,8 @@ class EmbeddingModel(torch.nn.Module):
 def CosineSimilarity(Model, word_to_idx, idx_to_word, Input_word, Word_num):
     # 创建 Model Copy
     W = Model.embed.weight.data.clone()
-    norm = W.norm(dim = 1).unsqueeze(dim = 1)
     # 单位化
+    norm = W.norm(dim = 1).unsqueeze(dim = 1)
     W = W/norm
     
     # 获取 Input_word 词向量
@@ -174,6 +175,25 @@ def CosineSimilarity(Model, word_to_idx, idx_to_word, Input_word, Word_num):
     
     topk = (-similarity[0,:]).argsort()[:Word_num]
     Res = [[idx_to_word[j.item()], similarity[0][j.item()].item()] for j in topk]
+    
+    return Res
+
+
+# 返回与 Input_word 距离最小的 Word_num 个单词
+# 返回一个二维 List[Word_num][1]
+# List[Word_num][0] 为单词，List[Word_num][1] 为距离
+def FindNearest(Model, word_to_idx, idx_to_word, Input_word, Word_num):
+    # 创建 Model Copy
+    W = Model.embed.weight.data.clone()
+    # 获取 Input_word 词向量
+    ids = [word_to_idx.get(Input_word, word_to_idx["<unk>"])]
+    x = W[ids]
+    
+    # 计算所有30000个embedding向量与传入单词embedding向量的相似度距离
+    Distance = torch.nn.PairwiseDistance(p=2)
+    cos_dis = Distance(x,W)
+    topk = cos_dis.argsort()[:Word_num]
+    Res = [[idx_to_word[j.item()], cos_dis[j.item()].item()] for j in topk]
     
     return Res
 
@@ -225,18 +245,21 @@ def  StartTraining(word):
                     Optimizer.step()
         
                 print(f'Epoch {j+1}/{EpochsNum} - Loss: {loss.item():.4f}')
-            
+    # 输出 word
+    print(word)        
     # 输出 word 的词向量
-    print(Model.embed.weight.data[word_to_idx[word]])
+    print(Model.embed.weight.data[word_to_idx.get(word, word_to_idx["<unk>"])])
     # 输出与 word 最相似的 5 个词
     print(CosineSimilarity(Model, word_to_idx, idx_to_word, word, 5))
+    # 输出与 word 最近的 5 个词
+    print(FindNearest(Model, word_to_idx, idx_to_word, word, 5))
     return
 
 
 def main():
     
     # 开始训练
-    StartTraining(word = "this")
+    StartTraining(word = "coronavirus")
     
     return
 
