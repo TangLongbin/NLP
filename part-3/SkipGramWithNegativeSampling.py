@@ -7,16 +7,16 @@ import numpy as np
 # 分词文件夹目录
 TokensDirPath = "/home/tanglongbin/NLP/nltk_text"
 # 作为词汇表的Tokens文件数量
-TokensFileNum = 20
+TokensFileNum = 10
 # 词汇量
 VocabSize = 10000
 
 # 文章目录（split_text目录）
 TextDirPath = "/home/tanglongbin/NLP/split_text"
 # 用于训练的文章数量
-TextNum = 20
+TextNum = 2
 # 每篇文章训练的次数
-EpochsNum = 5
+EpochsNum = 10
 # 中心词一侧Positive单词的数量
 WindowSize = 5
 # Negative单词的数量
@@ -51,9 +51,9 @@ def GetVocab():
     TokensFiles = GetFilePath(TokensDirPath)
     for i in range(TokensFileNum):
         with open(TokensFiles[i], 'r') as f:
-            S = str(f.readlines())
+            S = f.readline()
             # String to List
-            L = S.strip('[').strip(']').split(',')
+            L = eval(S)
             TmpList += L
     
     # 获取频率最高的VocabSize-1个单词，并将剩下的单词归类为'<unk>'
@@ -156,26 +156,26 @@ class EmbeddingModel(torch.nn.Module):
         return self.embed.weight.data.cpu().numpy()
 
 
-# def StartTest(Model, word_to_idx, idx_to_word):
-#     TestWords = ["and", "am", "where", "bad"]
+def StartTest(Model, word_to_idx, idx_to_word):
+    TestWords = ['data', 'were', 'used', 'in', 'the', 'subsequent', 'analysis', 'as']
     
-#     W = Model.embed.weight.data.clone()
-#     norm = W.norm(dim = 1).unsqueeze(dim = 1)
+    W = Model.embed.weight.data.clone()
+    norm = W.norm(dim = 1).unsqueeze(dim = 1)
     
-#     W = W/norm
+    W = W/norm
     
-#     ids = [word_to_idx.get(word, word_to_idx["<unk>"]) for word in TestWords]
+    ids = [word_to_idx.get(word, word_to_idx["<unk>"]) for word in TestWords]
     
-#     x = W[ids]
+    x = W[ids]
     
-#     similarity = torch.mm(x, W.T)
+    similarity = torch.mm(x, W.T)
     
-#     for i in range(len(TestWords)) :
-#         topk = (-similarity[i,:]).argsort()[:5]
-#         topk = [idx_to_word[j.item()] for j in topk]
-#         print(TestWords[i], topk)
+    for i in range(len(TestWords)) :
+        topk = (-similarity[i,:]).argsort()[:5]
+        topk = [idx_to_word[j.item()] for j in topk]
+        print(TestWords[i], topk)
     
-#     return
+    return
 
 
 def  StartTraining():
@@ -198,14 +198,15 @@ def  StartTraining():
     TextFiles = GetFilePath(TextDirPath)
     for i in range(TextNum):
         with open(TextFiles[i]) as f:
-            S = str(f.readlines())
+            S = f.readline()
             # String to List
-            Text = S.strip('[').strip(']').split(',')
+            Text = eval(S)
             
             # 创建DataLoader
             dataset = Dataset(Text, word_to_idx, idx_to_word, word_freqs)
             dataloader = torch.utils.data.DataLoader(dataset, batch_size = Batch_Size, shuffle = True, num_workers = 2)
             
+            print(f'Text {i+1}/{TextNum}')
             # StartTraining
             for j in range(EpochsNum):
                 for k, (input_labels, pos_labels, neg_labels) in enumerate(dataloader):
@@ -224,7 +225,7 @@ def  StartTraining():
                     Optimizer.step()
         
                 print(f'Epoch {j+1}/{EpochsNum} - Loss: {loss.item():.4f}')
-        
+            # StartTest(Model, word_to_idx, idx_to_word)
     return
 
 
