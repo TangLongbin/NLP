@@ -250,9 +250,9 @@ def  StartTraining(word):
     # 输出 word 的词向量
     print(Model.embed.weight.data[word_to_idx.get(word, word_to_idx["<unk>"])])
     # 输出与 word 最相似的 5 个词
-    print(CosineSimilarity(Model, word_to_idx, idx_to_word, word, 5))
+    # print(CosineSimilarity(Model, word_to_idx, idx_to_word, word, 5))
     # 输出与 word 最近的 5 个词
-    print(FindNearest(Model, word_to_idx, idx_to_word, word, 5))
+    # print(FindNearest(Model, word_to_idx, idx_to_word, word, 5))
     return
 
 
